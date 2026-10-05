@@ -1,0 +1,195 @@
+{
+  "users": [
+    {
+      "id": "usr_dharini_01",
+      "name": "Dharini",
+      "email": "dharini@floodmonitor.org",
+      "passwordHash": "$2a$10$RyGSFhQGe2lRkb/jvd9FTuj0V5kwWuEG9Nb9OCfJyHIpZdU65i1rq",
+      "createdAt": "2026-10-05T08:25:43.570Z"
+    },
+    {
+      "id": "usr_1791189006549",
+      "name": "Amit",
+      "email": "amit@gmail.com",
+      "passwordHash": "$2a$10$JK3ZXb1w/ylS0U1lEyrYkuF7JiUpcFmhk/MQkoDF6ZIKodmVq8x92",
+      "createdAt": "2026-10-05T08:30:06.558Z"
+    }
+  ],
+  "deviceState": {
+    "online": true,
+    "lastSeen": "2026-10-05T08:50:03.145Z",
+    "waterLevel": 25,
+    "rainfall": "No",
+    "status": "Warning",
+    "district": "Nagpur",
+    "lat": 21.1458,
+    "lon": 79.0882,
+    "line1": "Flood Monitoring",
+    "line2": "System",
+    "led": "OFF",
+    "buzzerAlert": false,
+    "thresholds": {
+      "safe": 15,
+      "warning": 25,
+      "danger": 25
+    }
+  },
+  "stations": [
+    {
+      "id": "st-01",
+      "name": "Nagpur Main Station (Nag River)",
+      "district": "Nagpur",
+      "lat": 21.1458,
+      "lon": 79.0882,
+      "waterLevel": 25,
+      "rainfall": "No",
+      "status": "Warning",
+      "dangerLevel": 25,
+      "warningLevel": 15,
+      "riverBasin": "Kanhan / Wainganga",
+      "lastUpdate": "02:20 PM"
+    },
+    {
+      "id": "st-02",
+      "name": "Bhandara Barrage Station",
+      "district": "Bhandara",
+      "lat": 21.1713,
+      "lon": 79.6545,
+      "waterLevel": 18,
+      "rainfall": "Yes",
+      "status": "Warning",
+      "dangerLevel": 25,
+      "warningLevel": 15,
+      "riverBasin": "Wainganga Basin"
+    },
+    {
+      "id": "st-03",
+      "name": "Chandrapur Erai River Gauge",
+      "district": "Chandrapur",
+      "lat": 19.9615,
+      "lon": 79.2961,
+      "waterLevel": 28,
+      "rainfall": "Yes",
+      "status": "Danger",
+      "dangerLevel": 25,
+      "warningLevel": 15,
+      "riverBasin": "Wardha / Godavari"
+    },
+    {
+      "id": "st-04",
+      "name": "Wardha River Telemetry Node",
+      "district": "Wardha",
+      "lat": 20.7453,
+      "lon": 78.6022,
+      "waterLevel": 9,
+      "rainfall": "No",
+      "status": "Safe",
+      "dangerLevel": 25,
+      "warningLevel": 15,
+      "riverBasin": "Wardha Basin"
+    },
+    {
+      "id": "st-05",
+      "name": "Gadchiroli Pranhita Outpost",
+      "district": "Gadchiroli",
+      "lat": 20.1809,
+      "lon": 79.9937,
+      "waterLevel": 27,
+      "rainfall": "Yes",
+      "status": "Danger",
+      "dangerLevel": 25,
+      "warningLevel": 15,
+      "riverBasin": "Pranhita / Godavari"
+    }
+  ],
+  "records": [
+    {
+      "id": "rec_1791190203145",
+      "waterLevel": "25 cm",
+      "waterLevelValue": 25,
+      "rainfall": "No",
+      "district": "Nagpur",
+      "time": "02:20 PM",
+      "date": "05-10-2026",
+      "status": "Warning",
+      "timestamp": 1791190203145
+    },
+    {
+      "id": "rec_1791190200944",
+      "waterLevel": "25 cm",
+      "waterLevelValue": 25,
+      "rainfall": "No",
+      "district": "Nagpur",
+      "time": "02:20 PM",
+      "date": "05-10-2026",
+      "status": "Warning",
+      "timestamp": 1791190200944
+    },
+    {
+      "id": "rec_01",
+      "waterLevel": "5 cm",
+      "waterLevelValue": 5,
+      "rainfall": "Yes",
+      "district": "Nagpur",
+      "time": "10:15 AM",
+      "date": "05-10-2026",
+      "status": "Safe",
+      "timestamp": 1791174343570
+    },
+    {
+      "id": "rec_02",
+      "waterLevel": "8 cm",
+      "waterLevelValue": 8,
+      "rainfall": "Yes",
+      "district": "Nagpur",
+      "time": "11:00 AM",
+      "date": "05-10-2026",
+      "status": "Safe",
+      "timestamp": 1791177943570
+    },
+    {
+      "id": "rec_03",
+      "waterLevel": "12 cm",
+      "waterLevelValue": 12,
+      "rainfall": "Yes",
+      "district": "Nagpur",
+      "time": "11:45 AM",
+      "date": "05-10-2026",
+      "status": "Safe",
+      "timestamp": 1791181543570
+    },
+    {
+      "id": "rec_04",
+      "waterLevel": "19 cm",
+      "waterLevelValue": 19,
+      "rainfall": "Yes",
+      "district": "Bhandara",
+      "time": "12:30 PM",
+      "date": "05-10-2026",
+      "status": "Warning",
+      "timestamp": 1791183343570
+    },
+    {
+      "id": "rec_05",
+      "waterLevel": "26 cm",
+      "waterLevelValue": 26,
+      "rainfall": "Yes",
+      "district": "Chandrapur",
+      "time": "01:10 PM",
+      "date": "05-10-2026",
+      "status": "Danger",
+      "timestamp": 1791185863570
+    },
+    {
+      "id": "rec_06",
+      "waterLevel": "29 cm",
+      "waterLevelValue": 29,
+      "rainfall": "Yes",
+      "district": "Gadchiroli",
+      "time": "01:40 PM",
+      "date": "05-10-2026",
+      "status": "Danger",
+      "timestamp": 1791187663570
+    }
+  ]
+}

@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flood Monitoring System - IoT Telemetry & Web Dashboard</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              200: '#bae6fd',
+              300: '#7dd3fc',
+              400: '#38bdf8',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              800: '#075985',
+              900: '#0c4a6e',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Leaflet CSS & JS for Tab 3 Flood Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="min-h-screen bg-gradient-to-br from-sky-50 via-cyan-50 to-blue-100 text-slate-800 dark:from-slate-950 dark:via-sky-950 dark:to-slate-900 dark:text-slate-100 transition-colors duration-300 flex flex-col justify-between">
+
+  <!-- ======================================================== -->
+  <!-- DANGER ALERT POPUP MODAL & BANNER (Web Audio Buzzer) -->
+  <!-- ======================================================== -->
+  <div id="dangerBanner" class="hidden sticky top-0 z-50 bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white px-4 py-3 shadow-xl border-b-2 border-red-400">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
+      <div class="flex items-center gap-3">
+        <span class="p-2 bg-red-800 rounded-full animate-bounce">
+          <i data-lucide="alert-triangle" class="w-6 h-6 text-yellow-300"></i>
+        </span>
+        <div>
+          <span class="font-extrabold tracking-wide uppercase text-sm sm:text-base">CRITICAL FLOOD ALERT SPOTTED!</span>
+          <p id="dangerBannerText" class="text-xs sm:text-sm text-red-100 font-medium">Water level has crossed the safe threshold. Danger status activated!</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="btnToggleBuzzerAudio" class="px-3 py-1.5 bg-red-900 hover:bg-red-950 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
+          <i data-lucide="volume-2" class="w-4 h-4" id="buzzerIcon"></i>
+          <span id="buzzerText">Buzzer Sounding</span>
+        </button>
+        <button onclick="dismissDangerAlert()" class="p-1 hover:bg-red-800 rounded-lg text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Location Permission Modal / Banner -->
+  <div id="locationNotice" class="hidden bg-sky-600/90 text-white text-xs px-4 py-2 text-center flex items-center justify-center gap-2">
+    <i data-lucide="map-pin" class="w-4 h-4"></i>
+    <span>Location permission granted. Syncing telemetry with detected district coordinates.</span>
+    <button onclick="document.getElementById('locationNotice').classList.add('hidden')" class="underline ml-2">Dismiss</button>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- PAGE 1: AUTHENTICATION (Login & Registration) -->
+  <!-- ======================================================== -->
+  <section id="authPage" class="w-full flex-grow flex items-center justify-center px-4 py-12">
+    <div class="w-full max-w-md bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-sky-100 dark:border-sky-900/40 relative overflow-hidden">
+      <!-- Gradient Accent Glow -->
+      <div class="absolute -top-24 -right-24 w-48 h-48 bg-sky-400/30 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-24 -left-24 w-48 h-48 bg-cyan-400/20 rounded-full blur-3xl pointer-events-none"></div>
+
+      <!-- App Header Badge -->
+      <div class="text-center mb-6">
+        <div class="inline-flex p-3 bg-gradient-to-tr from-sky-500 to-cyan-400 rounded-2xl shadow-lg shadow-sky-500/30 mb-3 text-white">
+          <i data-lucide="waves" class="w-9 h-9"></i>
+        </div>
+        <h1 class="text-2xl font-black bg-gradient-to-r from-sky-600 to-cyan-500 bg-clip-text text-transparent">
+          Flood Monitoring System
+        </h1>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          IoT NodeMCU ESP8266 Telemetry & Early Warning Gateway
+        </p>
+      </div>
+
+      <!-- Login / Register Tab Pills -->
+      <div class="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-6">
+        <button id="tabBtnLogin" onclick="switchAuthMode('login')" class="flex-1 py-2 text-xs font-bold rounded-lg transition bg-white dark:bg-slate-700 shadow text-sky-600 dark:text-sky-300">
+          Sign In
+        </button>
+        <button id="tabBtnRegister" onclick="switchAuthMode('register')" class="flex-1 py-2 text-xs font-bold rounded-lg transition text-slate-500 dark:text-slate-400 hover:text-sky-500">
+          Registration Link
+        </button>
+      </div>
+
+      <!-- Alert / Error message container -->
+      <div id="authAlert" class="hidden mb-4 p-3 rounded-xl text-xs font-medium"></div>
+
+      <!-- Sign In Form -->
+      <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
+          <div class="relative">
+            <i data-lucide="mail" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+            <input type="email" id="loginEmail" required value="dharini@floodmonitor.org" placeholder="you@domain.com"
+              class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Password</label>
+          <div class="relative">
+            <i data-lucide="lock" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+            <input type="password" id="loginPassword" required value="password123" placeholder="••••••••"
+              class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500" />
+          </div>
+        </div>
+
+        <button type="submit" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-500 via-cyan-500 to-blue-600 text-white font-bold text-sm shadow-lg shadow-sky-500/25 hover:opacity-95 transition">
+          Sign In to Dashboard
+        </button>
+
+        <button type="button" onclick="quickFillDemoLogin()" class="w-full py-2 rounded-xl border border-sky-300 dark:border-sky-800 text-sky-600 dark:text-sky-400 font-semibold text-xs hover:bg-sky-50 dark:hover:bg-slate-800 transition flex items-center justify-center gap-1.5">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+          1-Click Demo Login (Welcome Dharini)
+        </button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="registerForm" onsubmit="handleRegister(event)" class="space-y-4 hidden">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Full Name</label>
+          <div class="relative">
+            <i data-lucide="user" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+            <input type="text" id="regName" required placeholder="e.g. Dharini"
+              class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
+          <div class="relative">
+            <i data-lucide="mail" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+            <input type="email" id="regEmail" required placeholder="name@email.com"
+              class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Password</label>
+          <div class="relative">
+            <i data-lucide="lock" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+            <input type="password" id="regPassword" required placeholder="••••••••"
+              class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500" />
+          </div>
+        </div>
+
+        <button type="submit" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-500 via-cyan-500 to-blue-600 text-white font-bold text-sm shadow-lg shadow-sky-500/25 hover:opacity-95 transition">
+          Create Account & Register
+        </button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ======================================================== -->
+  <!-- PAGE 2: WEB DASHBOARD (TABS 1, 2, 3) -->
+  <!-- ======================================================== -->
+  <div id="dashboardPage" class="hidden flex-grow flex flex-col">
+
+    <!-- Unified Dashboard Header -->
+    <header class="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/85 backdrop-blur-md border-b border-sky-100 dark:border-slate-800 shadow-sm">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+        
+        <!-- Left: Project Name & User Greeting -->
+        <div class="flex items-center gap-3">
+          <div class="p-2.5 bg-gradient-to-tr from-sky-500 to-cyan-400 rounded-xl text-white shadow-md shadow-sky-500/20">
+            <i data-lucide="shield-alert" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h1 class="text-lg sm:text-xl font-extrabold tracking-tight bg-gradient-to-r from-sky-600 via-cyan-500 to-blue-600 bg-clip-text text-transparent">
+              Flood Monitoring System
+            </h1>
+            <p id="userGreeting" class="text-xs font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+              <span>Welcome Dharini</span>
+              <span class="inline-block w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+              <span class="text-slate-400 font-normal">Asia/Kolkata (+5:30)</span>
+            </p>
+          </div>
+        </div>
+
+        <!-- Middle: Hardware Status Badge (ONLINE / OFFLINE) -->
+        <div class="flex items-center gap-2">
+          <div id="deviceStatusBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition">
+            <span class="relative flex h-2.5 w-2.5">
+              <span id="devicePulseRing" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span id="devicePulseDot" class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <span id="deviceStatusText">ESP8266 ONLINE</span>
+          </div>
+
+          <span id="lastSeenText" class="text-[11px] text-slate-400 hidden sm:inline">Active</span>
+        </div>
+
+        <!-- Right Controls: Audio buzzer toggle, Dark/Light Toggle, Logout -->
+        <div class="flex items-center gap-2">
+          <!-- Buzzer Audio Sound Mute/Unmute -->
+          <button id="btnHeaderBuzzer" onclick="toggleAudioMute()" title="Toggle Web Buzzer Audio"
+            class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition">
+            <i data-lucide="volume-2" class="w-4 h-4" id="headerBuzzerIcon"></i>
+          </button>
+
+          <!-- Light/Dark Theme Toggle -->
+          <button id="themeToggleBtn" onclick="toggleTheme()" title="Switch Light/Dark Theme"
+            class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition">
+            <i data-lucide="moon" class="w-4 h-4 hidden dark:block"></i>
+            <i data-lucide="sun" class="w-4 h-4 block dark:hidden"></i>
+          </button>
+
+          <!-- Logout Button -->
+          <button onclick="handleLogout()" class="px-3 py-1.5 rounded-xl border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 text-xs font-semibold hover:bg-red-50 dark:hover:bg-red-950/30 transition flex items-center gap-1">
+            <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+            <span>Logout</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab Navigation Bar -->
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-100 dark:border-slate-800/80">
+        <nav class="flex space-x-2 sm:space-x-8 py-2 overflow-x-auto" aria-label="Tabs">
+          <button onclick="switchTab('tab1')" id="tabNav1" class="tab-nav-btn py-2 px-3 border-b-2 font-bold text-xs sm:text-sm border-sky-500 text-sky-600 dark:text-sky-400 flex items-center gap-2 whitespace-nowrap">
+            <i data-lucide="activity" class="w-4 h-4"></i>
+            Tab 1: Live Monitoring & Records
+          </button>
+          <button onclick="switchTab('tab2')" id="tabNav2" class="tab-nav-btn py-2 px-3 border-b-2 font-semibold text-xs sm:text-sm border-transparent text-slate-500 hover:text-sky-500 dark:text-slate-400 flex items-center gap-2 whitespace-nowrap">
+            <i data-lucide="sliders" class="w-4 h-4"></i>
+            Tab 2: Telemetry & Actuator Controls
+          </button>
+          <button onclick="switchTab('tab3')" id="tabNav3" class="tab-nav-btn py-2 px-3 border-b-2 font-semibold text-xs sm:text-sm border-transparent text-slate-500 hover:text-sky-500 dark:text-slate-400 flex items-center gap-2 whitespace-nowrap">
+            <i data-lucide="map" class="w-4 h-4"></i>
+            Tab 3: Geographic Flood Map
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-grow">
+
+      <!-- ======================================================== -->
+      <!-- TAB 1: WEB DASHBOARD (TAB 1) -->
+      <!-- ======================================================== -->
+      <section id="tab1Content" class="tab-pane space-y-8">
+        
+        <!-- SECTION 1: LIVE FLOOD GAUGES & CHARTS -->
+        <div>
+          <!-- Section 1 Header & Geolocation Permission Badge -->
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 class="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+                <span class="p-1.5 bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-lg">
+                  <i data-lucide="radio" class="w-5 h-5"></i>
+                </span>
+                Section 1: Live Flood Gauges & Station Telemetry
+              </h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Ultrasonic sensor water level in centimeter (cm) with automatic danger alert signs and buzzer beeps.
+              </p>
+            </div>
+
+            <!-- Current Location Badge (Request Location Permission Prior) -->
+            <div class="flex items-center gap-2 bg-white/80 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-sky-100 dark:border-slate-700 shadow-sm">
+              <i data-lucide="map-pin" class="w-4 h-4 text-sky-500"></i>
+              <div class="text-xs">
+                <span class="text-slate-400">Current Flood Location:</span>
+                <span id="currentLocationName" class="font-bold text-sky-700 dark:text-sky-300">Nagpur (Maharashtra)</span>
+                <span id="currentCoordinates" class="text-[11px] text-slate-400 ml-1">(21.1458° N, 79.0882° E)</span>
+              </div>
+              <button onclick="requestGeolocation()" title="Update Current GPS Location" class="text-xs text-sky-600 hover:text-sky-800 dark:text-sky-400 ml-1 underline">
+                Refresh GPS
+              </button>
+            </div>
+          </div>
+
+          <!-- Top Metric Cards Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+            <!-- Card 1: Water Level Colorful Large Font Gauge / Seek Bar -->
+            <div class="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl p-6 rounded-3xl border border-sky-100 dark:border-slate-700/60 shadow-lg relative overflow-hidden">
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Water Level (Centimeter)</span>
+                <span id="waterStatusPill" class="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                  SAFE
+                </span>
+              </div>
+
+              <!-- Large Font Water Level Value -->
+              <div class="flex items-baseline gap-2 mb-3">
+                <span id="displayWaterLevel" class="text-5xl sm:text-6xl font-black tracking-tight text-slate-900 dark:text-white">5</span>
+                <span class="text-2xl font-bold text-sky-500">cm</span>
+              </div>
+
+              <!-- Colorful Seek Bar / Custom Gauge Meter -->
+              <div class="space-y-2 mb-3">
+                <div class="w-full bg-slate-200 dark:bg-slate-700 h-4 rounded-full overflow-hidden p-0.5 relative">
+                  <div id="waterLevelBar" class="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-emerald-400 via-yellow-400 to-red-500" style="width: 15%;"></div>
+                </div>
+                <div class="flex justify-between text-[11px] font-bold text-slate-400">
+                  <span>0 cm (Safe &lt; 15)</span>
+                  <span>15 cm (Warning)</span>
+                  <span>25+ cm (Danger)</span>
+                </div>
+              </div>
+
+              <!-- Danger Warning Indicator Sign -->
+              <div id="dangerIndicatorSign" class="hidden mt-3 p-3 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 rounded-2xl flex items-center gap-3">
+                <span class="p-2 bg-red-600 text-white rounded-xl danger-alert-glow">
+                  <i data-lucide="flame" class="w-5 h-5"></i>
+                </span>
+                <div>
+                  <h4 class="text-xs font-extrabold text-red-700 dark:text-red-400 uppercase">DANGER LEVEL EXCEEDED!</h4>
+                  <p class="text-[11px] text-red-600 dark:text-red-300">Buzzer active. Evacuate low-lying river embankments immediately.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 2: Raindrop Sensor (MH-RD Status) -->
+            <div class="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl p-6 rounded-3xl border border-sky-100 dark:border-slate-700/60 shadow-lg relative overflow-hidden flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between mb-3">
+                  <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Rainfall Detection (MH-RD)</span>
+                  <span class="p-2 bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-xl">
+                    <i data-lucide="cloud-rain" class="w-5 h-5"></i>
+                  </span>
+                </div>
+                <div class="flex items-baseline gap-2 mb-2">
+                  <span id="displayRainfall" class="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white">Yes</span>
+                </div>
+                <p id="rainDescription" class="text-xs text-slate-500 dark:text-slate-400">
+                  Continuous precipitation detected by MH-RD module at Pin D7.
+                </p>
+              </div>
+
+              <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs font-semibold text-slate-500">
+                <span>Sensor Pin: D7 (MH-RD)</span>
+                <span id="rainBadge" class="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">Precipitation Active</span>
+              </div>
+            </div>
+
+            <!-- Card 3: ESP8266 Hardware Telemetry Summary -->
+            <div class="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl p-6 rounded-3xl border border-sky-100 dark:border-slate-700/60 shadow-lg flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between mb-3">
+                  <span class="text-xs font-bold uppercase tracking-wider text-slate-400">NodeMCU Node Status</span>
+                  <span class="p-2 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl">
+                    <i data-lucide="cpu" class="w-5 h-5"></i>
+                  </span>
+                </div>
+                <div class="space-y-2 text-xs">
+                  <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                    <span class="text-slate-400">Microcontroller:</span>
+                    <span class="font-bold text-slate-700 dark:text-slate-200">ESP8266 (CP2102)</span>
+                  </div>
+                  <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                    <span class="text-slate-400">Ultrasonic Pin:</span>
+                    <span class="font-bold text-slate-700 dark:text-slate-200">HC-SR04 (Trig D5, Echo D6)</span>
+                  </div>
+                  <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
+                    <span class="text-slate-400">LCD & Buzzer:</span>
+                    <span class="font-bold text-slate-700 dark:text-slate-200">LCD 16x2 @0x27 | Buzzer D3</span>
+                  </div>
+                  <div class="flex justify-between py-1">
+                    <span class="text-slate-400">LED State (D0):</span>
+                    <span id="displayLedState" class="font-bold text-sky-600 dark:text-sky-400">OFF</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-3 pt-2 text-[11px] text-slate-400 flex items-center justify-between">
+                <span>Update Interval: 10s</span>
+                <span id="currentTimeDisplay" class="font-mono">--:-- --</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Section 1 Graph: Real-time Water Level Trend Graph -->
+          <div class="mt-6 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl p-6 rounded-3xl border border-sky-100 dark:border-slate-700/60 shadow-lg">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <i data-lucide="line-chart" class="w-4 h-4 text-sky-500"></i>
+                  Water Level Telemetry Graph (Centimeters vs Time)
+                </h3>
+                <p class="text-xs text-slate-400">Real-time water depth measured by ultrasonic sensor with warning/danger threshold lines</p>
+              </div>
+              <div class="flex items-center gap-3 text-xs">
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-sky-500"></span> Level (cm)</span>
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-yellow-500"></span> Warning (15cm)</span>
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-red-500"></span> Danger (25cm)</span>
+              </div>
+            </div>
+            <div class="h-64 sm:h-72 w-full">
+              <canvas id="waterLevelChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 2: SEARCH CITY & ALL SAVED RECORDS (WITH PAGINATION) -->
+        <div class="pt-6 border-t border-slate-200 dark:border-slate-700">
+          <div class="mb-4">
+            <h2 class="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+              <span class="p-1.5 bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-lg">
+                <i data-lucide="database" class="w-5 h-5"></i>
+              </span>
+              Section 2: City Coordinate Search & Saved Telemetry Records
+            </h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              Search a city: if city coordinates match the hardware location, station details are highlighted below with full paginated records.
+            </p>
+          </div>
+
+          <!-- City Coordinate Search Bar -->
+          <div class="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl p-4 sm:p-5 rounded-3xl border border-sky-100 dark:border-slate-700/60 shadow-md mb-6">
+            <div class="flex flex-col sm:flex-row gap-3">
+              <div class="relative flex-grow">
+                <i data-lucide="search" class="w-5 h-5 absolute left-3.5 top-3.5 text-slate-400"></i>
+                <input type="text" id="citySearchInput" oninput="handleCitySearch(event)" placeholder="Search city or district (e.g., Nagpur, Bhandara, Chandrapur, Mumbai)..."
+                  class="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/70 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-800 dark:text-slate-100" />
+              </div>
+              <button onclick="clearCitySearch()" class="px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-xs font-bold text-slate-600 dark:text-slate-300 transition">
+                Reset
+              </button>
+            </div>
+
+            <!-- Matched Hardware City Banner -->
+            <div id="matchedCityResult" class="hidden mt-4 p-4 rounded-2xl bg-gradient-to-r from-sky-500/10 via-cyan-500/10 to-blue-500/10 border border-sky-300 dark:border-sky-800 flex items-center justify-between flex-wrap gap-3">
+              <div class="flex items-center gap-3">
+                <span class="p-2.5 bg-sky-500 text-white rounded-xl">
+                  <i data-lucide="check-circle-2" class="w-6 h-6"></i>
+                </span>
+                <div>
+                  <h4 class="text-sm font-extrabold text-sky-900 dark:text-sky-200">
+                    MATCH CONFIRMED: Hardware Coordinates Synchronized!
+                  </h4>
+                  <p id="matchedCityDetails" class="text-xs text-sky-700 dark:text-sky-300">
+                    City matches NodeMCU hardware location (Nagpur, 21.1458° N, 79.0882° E). River Basin: Kanhan / Wainganga.
+                  </p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 text-xs">
+                <span class="px-2.5 py-1 bg-white/80 dark:bg-slate-800 rounded-lg font-bold text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700">
+                  Telemetry Active
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- All Saved Records Table (Pagination) -->
+          <div class="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl border border-sky-100 dark:border-slate-700/60 shadow-lg overflow-hidden">
+            <div class="p-5 border-b border-slate-100 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white">All Saved Telemetry Records</h3>
+                <p class="text-xs text-slate-400">Timestamped in Asia/Kolkata (+5:30) with water level, rainfall flag and action controls</p>
+              </div>
+
+              <!-- Reference Link to Central Water Commission Flood Forecast -->
+              <a href="https://ffs.india-water.gov.in/#/" target="_blank" rel="noopener noreferrer"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-sky-600 to-cyan-600 text-white text-xs font-semibold shadow hover:opacity-90 transition">
+                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                <span>Refer Central Water Commission (ffs.india-water.gov.in)</span>
+              </a>
+            </div>
+
+            <!-- Table Container -->
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                <thead>
+                  <tr class="bg-slate-50/80 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold uppercase text-[11px] tracking-wider">
+                    <th class="py-3 px-4">#</th>
+                    <th class="py-3 px-4">Water Level</th>
+                    <th class="py-3 px-4">RainFall (Yes or No)</th>
+                    <th class="py-3 px-4">District</th>
+                    <th class="py-3 px-4">Time</th>
+                    <th class="py-3 px-4">Date</th>
+                    <th class="py-3 px-4 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="recordsTableBody" class="divide-y divide-slate-100 dark:divide-slate-700/60">
+                  <!-- Dynamic Rows populated via JavaScript -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination Bar -->
+            <div class="p-4 bg-slate-50/60 dark:bg-slate-900/40 border-t border-slate-100 dark:border-slate-700/60 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <span id="paginationInfo" class="text-slate-500 dark:text-slate-400 font-medium">
+                Showing 1 to 10 of 25 records
+              </span>
+              <div class="flex items-center gap-1.5">
+                <button id="btnPrevPage" onclick="changePage(-1)" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 font-semibold transition">
+                  Previous
+                </button>
+                <div id="pageNumbersContainer" class="flex items-center gap-1"></div>
+                <button id="btnNextPage" onclick="changePage(1)" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 font-semibold transition">
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 2 Graph: Correlation & Trend Graph under the records table -->
+          <div class="mt-6 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl p-6 rounded-3xl border border-sky-100 dark:border-slate-700/60 shadow-lg">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <i data-lucide="bar-chart-2" class="w-4 h-4 text-sky-500"></i>
+                  Rainfall vs Water Level Correlation Trend
+                </h3>
+                <p class="text-xs text-slate-400">Analysis of precipitation presence vs measured river water height across records</p>
+              </div>
+            </div>
+            <div class="h-64 sm:h-72 w-full">
+              <canvas id="correlationChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- TAB 2: WEB DASHBOARD (TAB 2) - TELEMETRY & CONTROLS -->
+      <!-- ======================================================== -->
+      <section id="tab2Content" class="tab-pane hidden space-y-8">
+        
+        <div>
+          <h2 class="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white mb-2">
+            <span class="p-1.5 bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-lg">
+              <i data-lucide="terminal" class="w-5 h-5"></i>
+            </span>
+            Tab 2: ESP8266 Actuator Telemetry & Manual Testing Station
+          </h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            Configure custom 16x2 LCD text messages, toggle LED D0, adjust safety thresholds, and manually simulate telemetry.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          <!-- Virtual 16x2 LCD Display Mirror -->
+          <div class="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl p-6 rounded-3xl border border-sky-100 dark:border-slate-700/60 shadow-lg">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <i data-lucide="monitor" class="w-4 h-4 text-sky-500"></i>
+                Virtual 16x2 I2C LCD Display (0x27 @ D1, D2)
+              </h3>
+              <span class="text-[11px] px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-900/60 text-sky-600 dark:text-sky-400 font-mono">16x2 Chars</span>
+            </div>
+
+            <!-- Virtual LCD Screen Bezel -->
+            <div class="p-5 bg-slate-900 rounded-2xl shadow-2xl border-4 border-slate-700 relative">
+              <div class="virtual-lcd blue-backlight font-mono-lcd p-4 rounded-lg flex flex-col justify-center space-y-2 select-none">
+                <div class="text-lg tracking-widest font-bold h-7 truncate" id="lcdRow1">
+                  Flood Monitoring
+                </div>
+                <div class="text-lg tracking-widest font-bold h-7 truncate" id="lcdRow2">
+                  System
+                </div>
+              </div>
+              <div class="flex justify-between items-center text-[10px] text-slate-400 font-mono mt-3 px-1">
+                <span>Row 1: Line 1 (Max 16)</span>
+                <span>Row 2: Line 2 (Max 16)</span>
+              </div>
+            </div>
+
+            <!-- Custom LCD Message Form -->
+            <form onsubmit="handleSaveLcd(event)" class="mt-4 space-y-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Row 1 Text (Max 16 chars)</label>
+                <input type="text" id="inputLcdLine1" maxlength="16" placeholder="Flood Monitoring"
+                  class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Row 2 Text (Max 16 chars)</label>
+                <input type="text" id="inputLcdLine2" maxlength="16" placeholder="System"
+                  class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none" />
+              </div>
+              <button type="submit" class="w-full py-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs shadow transition">
+                Send Text to LCD Screen
+              </button>
+            </form>
+          </div>
+
+          <!-- Actuator Controls: LED D0, Buzzer Test & Thresholds -->
+          <div class="space-y-6">
+
+            <!-- LED D0 and Buzzer Remote Actuators -->
+            <div class="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl p-6 rounded-3xl border border-sky-100 dark:border-slate-700/60 shadow-lg">
+              <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-4">
+                <i data-lucide="zap" class="w-4 h-4 text-yellow-500"></i>
+                Remote Actuator Controls (LED D0 & Buzzer D3)
+              </h3>
+
+              <div class="grid grid-cols-2 gap-4">
+                <!-- LED D0 Toggle Card -->
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-700/50 flex flex-col justify-between">
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <span class="text-xs font-bold text-slate-700 dark:text-slate-200">LED Actuator</span>
+                      <i data-lucide="lightbulb" class="w-4 h-4 text-yellow-400"></i>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mb-3">Pin D0 (GPIO 16)</p>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button id="btnLedOn" onclick="setLedState('ON')" class="flex-1 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition">
+                      ON
+                    </button>
+                    <button id="btnLedOff" onclick="setLedState('OFF')" class="flex-1 py-1.5 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-lg transition">
+                      OFF
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Buzzer Test Card -->
+                <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-700/50 flex flex-col justify-between">
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <span class="text-xs font-bold text-slate-700 dark:text-slate-200">Hardware Buzzer</span>
+                      <i data-lucide="bell" class="w-4 h-4 text-red-500"></i>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mb-3">Pin D3 (Piezo Sounder)</p>
+                  </div>
+                  <button onclick="triggerWebBuzzerBeep(3)" class="w-full py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-1">
+                    <i data-lucide="volume-2" class="w-3.5 h-3.5"></i>
+                    Test Beep
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3 Threshold Values Configuration -->
+            <div class="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl p-6 rounded-3xl border border-sky-100 dark:border-slate-700/60 shadow-lg">
+              <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-3">
+                <i data-lucide="shield" class="w-4 h-4 text-sky-500"></i>
+                Configurable 3 Water Level Thresholds
+              </h3>
+              <p class="text-xs text-slate-400 mb-4">Values in centimeters determining Safe, Warning, and Danger alert levels</p>
+
+              <div class="grid grid-cols-3 gap-3">
+                <div class="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-800/50">
+                  <span class="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">1. Safe Level</span>
+                  <div class="text-lg font-black text-emerald-800 dark:text-emerald-200 mt-1">&le; 15 cm</div>
+                  <span class="text-[10px] text-emerald-600 dark:text-emerald-400">Normal Flow</span>
+                </div>
+                <div class="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800/50">
+                  <span class="text-[11px] font-bold text-amber-700 dark:text-amber-400">2. Warning Level</span>
+                  <div class="text-lg font-black text-amber-800 dark:text-amber-200 mt-1">16 - 25 cm</div>
+                  <span class="text-[10px] text-amber-600 dark:text-amber-400">Moderate Surge</span>
+                </div>
+                <div class="p-3 bg-red-50 dark:bg-red-950/30 rounded-xl border border-red-200 dark:border-red-800/50">
+                  <span class="text-[11px] font-bold text-red-700 dark:text-red-400">3. Danger Level</span>
+                  <div class="text-lg font-black text-red-800 dark:text-red-200 mt-1">&gt; 25 cm</div>
+                  <span class="text-[10px] text-red-600 dark:text-red-400">Buzzer Beeps!</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- Manual Testing Simulator Panel -->
+        <div class="bg-gradient-to-r from-sky-500/10 via-cyan-500/10 to-blue-500/10 dark:from-slate-800 dark:to-slate-800 p-6 rounded-3xl border border-sky-200 dark:border-sky-900 shadow-md">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <i data-lucide="play-circle" class="w-5 h-5 text-sky-500"></i>
+                Manual Testing Telemetry Injector (For Evaluation)
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Directly inject simulated sensor readings to test ultrasonic water level changes, rain sensor states, alarm triggers, and table pagination.
+              </p>
+            </div>
+            <span class="px-2.5 py-1 bg-sky-500 text-white rounded-lg text-xs font-bold">Manual Testing Ready</span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <!-- Slider for Water Level -->
+            <div>
+              <div class="flex justify-between text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                <span>Simulate Water Level:</span>
+                <span id="sliderValDisplay" class="text-sky-600 font-extrabold">5 cm</span>
+              </div>
+              <input type="range" id="simWaterSlider" min="1" max="45" value="5" oninput="updateSimSliderVal(this.value)" class="water-slider w-full cursor-pointer" />
+            </div>
+
+            <!-- Rainfall Dropdown -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Simulate Rainfall (MH-RD):</label>
+              <select id="simRainSelect" class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold focus:outline-none">
+                <option value="Yes">Yes (Rain Detected)</option>
+                <option value="No">No (Dry / Clear)</option>
+              </select>
+            </div>
+
+            <!-- Submit Simulation Button -->
+            <div>
+              <button onclick="injectSimulatedTelemetry()" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold text-xs shadow-md shadow-sky-500/25 hover:opacity-95 transition flex items-center justify-center gap-1.5">
+                <i data-lucide="send" class="w-4 h-4"></i>
+                Send Simulated Telemetry Packet
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- TAB 3: WEB DASHBOARD (TAB 3) - GEOGRAPHIC FLOOD MAP -->
+      <!-- ======================================================== -->
+      <section id="tab3Content" class="tab-pane hidden space-y-6">
+        
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+              <span class="p-1.5 bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-lg">
+                <i data-lucide="map-pinned" class="w-5 h-5"></i>
+              </span>
+              Tab 3: Geographic Flood Telemetry & River Basin Map
+            </h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              Interactive map view with recent flood and heavy rainfall data with color-coded safety markings.
+            </p>
+          </div>
+
+          <!-- Map Legend -->
+          <div class="flex items-center gap-2 bg-white/80 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+            <span class="flex items-center gap-1 text-emerald-600 font-bold"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Safe</span>
+            <span class="flex items-center gap-1 text-amber-600 font-bold"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Warning</span>
+            <span class="flex items-center gap-1 text-red-600 font-bold"><span class="w-2.5 h-2.5 rounded-full bg-red-500"></span> Danger</span>
+          </div>
+        </div>
+
+        <!-- Leaflet Map Container -->
+        <div class="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl p-4 rounded-3xl border border-sky-100 dark:border-slate-700/60 shadow-xl overflow-hidden relative">
+          <div id="floodMap"></div>
+        </div>
+
+        <!-- Station Summary Cards below Map -->
+        <div>
+          <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">
+            Monitored Regional Stations (Central Water Commission Standards)
+          </h3>
+          <div id="mapStationCardsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Injected via JavaScript -->
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- FOOTER (Appears on all pages/tabs) -->
+  <!-- ======================================================== -->
+  <footer class="w-full border-t border-sky-100 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md py-4 text-center">
+    <div class="max-w-7xl mx-auto px-4 flex items-center justify-center text-xs text-slate-600 dark:text-slate-400">
+      <span class="inline-flex items-center gap-1 font-medium">
+        Developed with Love
+        <!-- Pirate Animated Pulse Icon -->
+        <span class="pirate-pulse-icon mx-1 text-sky-500 inline-flex items-center" title="Pirate Animated Pulse Icon">
+          <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12c0 2.5 0.92 4.79 2.45 6.54L3 21l3.46-1.45C8.21 21.08 10.5 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm-3 8c.83 0 1.5.67 1.5 1.5S9.83 13 9 13s-1.5-.67-1.5-1.5.67-1.5 1.5-1.5zm6 0c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5-1.5-.67-1.5-1.5.67-1.5 1.5-1.5zm-3 7c-2.22 0-4-1.44-4-3h8c0 1.56-1.78 3-4 3z"/>
+          </svg>
+        </span>
+        by <strong class="font-extrabold bg-gradient-to-r from-sky-600 to-cyan-500 bg-clip-text text-transparent ml-0.5">Team Pirates</strong>
+      </span>
+    </div>
+  </footer>
+
+  <!-- Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>

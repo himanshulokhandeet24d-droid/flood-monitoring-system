@@ -1,0 +1,30 @@
+{
+  "name": "flood-monitoring-system",
+  "version": "1.0.0",
+  "description": "Innovative IoT and Web Application for Flood Monitoring System using ESP8266, Ultrasonic Sensor, Raindrop Sensor, 16x2 LCD, Buzzer, and LED. Deployable on Render.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "iot",
+    "flood-monitoring",
+    "esp8266",
+    "hc-sr04",
+    "mh-rd",
+    "express",
+    "render",
+    "tailwind"
+  ],
+  "author": "Team Pirates",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
